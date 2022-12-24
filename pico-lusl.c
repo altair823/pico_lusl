@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 #include "sd_card.h"
 #include "ff.h"
 
@@ -93,7 +94,12 @@ int main() {
 
     // Unmount drive
     f_unmount("0:");
-
+    while (true) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(250);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(250);
+    }
 
     return 0;
 }
