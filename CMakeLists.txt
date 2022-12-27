@@ -67,11 +67,16 @@ set(PICO_BOARD pico_w)
 
 # Creates a pico-sdk subdirectory in our project for the libraries
 pico_sdk_init()
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} 
     pico-lusl.c
     src/hw_config.c
+    src/dequeue.c
 )
 
 # Tell CMake where to find other source code
