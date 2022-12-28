@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +41,11 @@ chunk_ptr malloc_chunk();
 /// @return A pointer to the new chunk.
 chunk_ptr create_chunk(byte_ptr data, data_size_t size);
 
+/// @brief Free a chunk.
+/// @details This function will free a chunk.
+/// @param chunk The chunk to free.
+void free_chunk(chunk_ptr chunk);
+
 /// @brief Create a new Dequeue.
 /// @details This function will create a new dequeue and return a pointer to it.
 /// @return A pointer to the new dequeue.
@@ -53,4 +60,20 @@ void connect_chunks(chunk_ptr chunk1, chunk_ptr chunk2);
 /// @brief Pushback a chunk to the end of the dequeue.
 /// @details This function will pushback a new chunk to the end of the dequeue.
 /// @param dequeue The dequeue to pushback the chunk to.
-int pushback_chunk(dequeue_t head, chunk_ptr new_chunk);
+void pushback_chunk(dequeue_t head, chunk_ptr new_chunk);
+
+/// @brief Pop a chunk from the front of the dequeue.
+/// @details This function will pop a chunk from the front of the dequeue.
+/// @param dequeue The dequeue to pop the chunk from.
+/// @return A pointer to the popped chunk.
+chunk_ptr pop_chunk(dequeue_t head);
+
+/// @brief Print a chunk.
+/// @details This function will print a chunk.
+/// @param chunk The chunk to print.
+void print_chunk(chunk_ptr chunk);
+
+/// @brief Traverse the dequeue and print the data.
+/// @details This function will traverse the dequeue and print the data.
+/// @param dequeue The dequeue to traverse.
+void traverse_dequeue(dequeue_t head);

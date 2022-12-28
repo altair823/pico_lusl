@@ -22,13 +22,16 @@ chunk_ptr create_chunk(byte_ptr data, data_size_t size) {
     }
 }
 
+void free_chunk(chunk_ptr chunk) {
+    if (chunk != NULL) {
+        free(chunk->data);
+    }
+    free(chunk);
+}
+
 dequeue_t create_dequeue() {
     dequeue_t head = (chunk_t **)malloc(sizeof(chunk_t *));
-    *head = (chunk_t *)malloc(sizeof(chunk_t));
-    (*head)->data = NULL;
-    (*head)->size = 0;
-    (*head)->next = *head;
-    (*head)->prev = *head;
+    *head = NULL;
     return head;
 }
 
@@ -37,12 +40,51 @@ void connect_chunks(chunk_ptr chunk1, chunk_ptr chunk2) {
     chunk2->prev = chunk1;
 }
 
-int pushback_chunk(dequeue_t head, chunk_ptr new_chunk) {
-    if (head) {
-        printf("Error: head is NULL");
-        return -1;
+void pushback_chunk(dequeue_t head, chunk_ptr new_chunk) {
+    if (*head == NULL) {
+        *head = new_chunk;
     }
     connect_chunks((*head)->prev, new_chunk);
     connect_chunks(new_chunk, *head);
-    return 0;
+}
+
+chunk_ptr pop_chunk(dequeue_t head) {
+    if (*head == NULL) {
+        printf("Dequeue is empty");
+        return NULL;
+    } else if ((*head)->next == *head) {
+        chunk_ptr popped_chunk = *head;
+        *head = NULL;
+        popped_chunk->next = NULL;
+        popped_chunk->prev = NULL;
+        return popped_chunk;
+    } else {
+        chunk_ptr popped_chunk = *head;
+        (*head)->prev->next = (*head)->next;
+        (*head)->next->prev = (*head)->prev;
+        *head = (*head)->next;
+        popped_chunk->next = NULL;
+        popped_chunk->prev = NULL;
+        return popped_chunk;
+    }
+}
+
+void print_chunk(chunk_ptr chunk) {
+    if (chunk == NULL) {
+        printf("Dequeue is empty\r\n");
+    } else {
+        printf("%s\n", chunk->data);
+        printf("%d\n", chunk->size);
+    }
+}
+
+void traverse_dequeue(dequeue_t head) {
+    chunk_ptr current_chunk = *head;
+    if (current_chunk == NULL) {
+        printf("Dequeue is empty\r\n");
+    } 
+    do {
+        print_chunk(current_chunk);
+        current_chunk = current_chunk->next;
+    } while (current_chunk != *head);
 }

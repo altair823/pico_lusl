@@ -76,7 +76,6 @@ include_directories(
 add_executable(${PROJECT_NAME} 
     pico-lusl.c
     src/hw_config.c
-    src/dequeue.c
 )
 
 # Tell CMake where to find other source code
