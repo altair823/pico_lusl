@@ -9,14 +9,22 @@
 #define FILE_VERSION_FLAG 0x01
 #define MAJOR_VERSION 2
 #define MINOR_VERSION 0
-#define PATCH_VERSION 1
+#define PATCH_VERSION 2
 
-#define CHUNK_DATA_SIZE 512
+#define CHUNK_DATA_SIZE 65536
 typedef unsigned char byte;
 typedef byte *byte_ptr;
 
+bool read_file(FIL *file, byte_ptr data, size_t label_len, UINT read_count) {
+    if (f_read(file, data, label_len, &read_count) != FR_OK || read_count < label_len) {
+        printf("ERROR: Could not read from file\r\n");
+        return false;
+    }
+    return true;
+}
+
 int main() {
-    char filename[] = "bible.srl";
+    char filename[] = "filename.srl";
     FIL file;
 
     // Initialize chosen serial port
@@ -41,67 +49,141 @@ int main() {
         printf("ERROR: Could not open file (%d)\r\n", result);
         return -1;
     }
-    // Wait for user to press 'enter' to continue
-    // printf("\r\nSD card test. Press 'enter' to start.\r\n");
-    // scanf("%s", &buf);
-    // int size = strlen(buf);
-    // filename = (char *)malloc(sizeof(char) * (size + 1));
-    // strncpy(filename, buf + 1, size);
 
 
     // Read file
-    byte_ptr data = NULL;
+    byte_ptr buf = NULL;
     UINT read_count = 0;
 
     // Check file label
     size_t label_len = strlen(FILE_LABEL);
-    data = (byte_ptr)malloc(sizeof(byte) * label_len);
-    if (f_read(&file, data, label_len, &read_count) != FR_OK || read_count < label_len) {
-        printf("ERROR: Could not read from file (%d)\r\n", result);
-        return -1;
-    }
-    if (strncmp(FILE_LABEL, data, label_len) != 0) {
+    buf = (byte_ptr)malloc(sizeof(byte) * label_len);
+    read_file(&file, buf, label_len, read_count);
+    if (strncmp(FILE_LABEL, buf, label_len) != 0) {
         printf("ERROR: File is not a valid LUSL serialized file\r\n");
         return -1;
     }
-    free(data);
+    free(buf);
 
     // Check file version
-    data = (byte_ptr)malloc(sizeof(byte) * 4);
-    if (f_read(&file, data, 4, &read_count) != FR_OK || read_count < 4) {
-        printf("ERROR: Could not read from file (%d)\r\n", result);
-        return -1;
-    }
-    if (data[0] != FILE_VERSION_FLAG) {
+    buf = (byte_ptr)malloc(sizeof(byte) * 4);
+    read_file(&file, buf, 4, read_count);
+    if (buf[0] != FILE_VERSION_FLAG) {
         printf("ERROR: File is not a valid LUSL serialized file\r\n");
         return -1;
     }
-    if (data[1] != MAJOR_VERSION || data[2] > MINOR_VERSION || data[3] > PATCH_VERSION) {
+    if (buf[1] != MAJOR_VERSION || buf[2] > MINOR_VERSION || buf[3] > PATCH_VERSION) {
         printf("ERROR: File version is not compatible with this program\r\n");
         return -1;
     }
-    free(data);
+    free(buf);
 
-    // Read file count
-    data = (byte_ptr)malloc(sizeof(byte) * 1);
-    if (f_read(&file, data, 1, &read_count) != FR_OK || read_count < 1) {
-        printf("ERROR: Could not read from file (%d)\r\n", result);
+    // Read flags
+    buf = (byte_ptr)malloc(sizeof(byte) * 1);
+    read_file(&file, buf, 1, read_count);
+    if (buf[0] != 0) {
+        printf("ERROR: Cannot read file with this program\r\n");
         return -1;
     }
+    free(buf);
 
-    do {
-        data = (byte_ptr)malloc(sizeof(byte) * CHUNK_DATA_SIZE);
-        FRESULT result = f_read(&file, data, CHUNK_DATA_SIZE, &read_count);
-        if (result != FR_OK) {
-            printf("ERROR: Could not read from file (%d)\r\n", result);
-            break;
-        }
-        if (read_count > 0) {
-            for (int i = 0; i < read_count; i++) {
-                printf("%c", data[i]);
+    // Read file count
+    buf = (byte_ptr)malloc(sizeof(byte) * 1);
+    read_file(&file, buf, 1, read_count);
+    int file_count_bytes = buf[0];
+    free(buf);
+    buf = (byte_ptr)malloc(sizeof(byte) * file_count_bytes);
+    read_file(&file, buf, file_count_bytes, read_count);
+    int file_count = 0;
+    // Convert byte array to int with little endian
+    for (int i = 0; i < file_count_bytes; i++) {
+        file_count += buf[i] << (i * 8);
+    }
+    free(buf);
+
+    // Read files
+    for (int i = 0; i < file_count; i++) {
+        // Read file name
+        buf = (byte_ptr)malloc(sizeof(byte) * 2);
+        read_file(&file, buf, 2, read_count);
+        int file_name_len = (buf[0] << 8) + buf[1];
+        free(buf);
+        buf = (byte_ptr)malloc(sizeof(byte) * file_name_len);
+        read_file(&file, buf, file_name_len, read_count);
+        char *path = (char *)malloc(sizeof(char) * (file_name_len + 1));
+        strncpy(path, buf, file_name_len);
+        path[file_name_len] = '\0';
+        free(buf);
+
+        // Copy directory in the file name
+        int last_dir_index = 0;
+        for (int i = file_name_len - 1; i >= 0; i--) {
+            if (path[i] == '/') {
+                last_dir_index = i;
+                break;
             }
         }
-        free(data);
-        //sleep_ms(200);
-    } while(read_count > 0);
+        char *dir_name = (char *)malloc(sizeof(char) * (last_dir_index + 1));
+        strncpy(dir_name, path, last_dir_index);
+        dir_name[last_dir_index] = '\0';
+
+        // Create directory
+        result = f_mkdir(dir_name);
+        if (result != FR_OK && result != FR_EXIST) {
+            printf("ERROR: Could not create directory (%d)\r\n", result);
+            return -1;
+        }
+        free(dir_name);
+
+        // Read file type
+        buf = (byte_ptr)malloc(sizeof(byte) * 1);
+        read_file(&file, buf, 1, read_count);
+        int file_type = buf[0];
+        free(buf);
+
+        // Read file size
+        int size_bytes = file_type & 0xf;
+        buf = (byte_ptr)malloc(sizeof(byte) * size_bytes);
+        read_file(&file, buf, size_bytes, read_count);
+        int file_size = 0;
+        // Convert byte array to int with little endian
+        for (int i = 0; i < size_bytes; i++) {
+            file_size += buf[i] << (i * 8);
+        }
+        free(buf);
+
+        // Read file checksum
+        buf = (byte_ptr)malloc(sizeof(byte) * 32);
+        read_file(&file, buf, 32, read_count);
+        free(buf);
+
+        printf("File name: %s\r\n", path);
+        printf("File type: %d\r\n", file_type);
+        printf("File size: %d\r\n", file_size);
+
+        // Read file data with chunking and write to new file
+        int chunk_count = file_size / CHUNK_DATA_SIZE;
+        int last_chunk_size = file_size % CHUNK_DATA_SIZE;
+        FIL result_file;
+        f_open(&result_file, path, FA_WRITE | FA_CREATE_ALWAYS);
+        int p = 0;
+        for (int j = 0; j < chunk_count; j++, p++) {            
+            buf = (byte_ptr)malloc(sizeof(byte) * CHUNK_DATA_SIZE);
+            read_file(&file, buf, CHUNK_DATA_SIZE, read_count);
+            UINT write_count = 0;
+            f_write(&result_file, buf, CHUNK_DATA_SIZE, &write_count);
+            free(buf);
+            printf("%s Progress: %d%%\r", path, (p * 100) / chunk_count);
+        }
+        if (last_chunk_size > 0) {
+            buf = (byte_ptr)malloc(sizeof(byte) * last_chunk_size);
+            read_file(&file, buf, last_chunk_size, read_count);
+            UINT write_count = 0;
+            f_write(&result_file, buf, last_chunk_size, &write_count);
+            free(buf);
+        }
+        f_close(&result_file);
+        printf("%s Progress: 100%%\r\n", path);
+        free(path);
+    }
 }
