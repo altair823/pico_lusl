@@ -181,24 +181,24 @@ int main() {
         FIL result_file;
         f_open(&result_file, path, FA_WRITE | FA_CREATE_ALWAYS);
         int p = 0;
-        for (int j = 0; j < chunk_count; j++, p++) {        
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);    
+        for (int j = 0; j < chunk_count; j++, p++) {
             buf = (byte_ptr)malloc(sizeof(byte) * CHUNK_DATA_SIZE);
             read_file(&file, buf, CHUNK_DATA_SIZE, read_count);
             UINT write_count = 0;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
             f_write(&result_file, buf, CHUNK_DATA_SIZE, &write_count);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
             free(buf);
             printf("%s Progress: %d%%\r", path, (p * 100) / chunk_count);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
         }
         if (last_chunk_size > 0) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);    
             buf = (byte_ptr)malloc(sizeof(byte) * last_chunk_size);
             read_file(&file, buf, last_chunk_size, read_count);
             UINT write_count = 0;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
             f_write(&result_file, buf, last_chunk_size, &write_count);
-            free(buf);
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            free(buf);
         }
         f_close(&result_file);
         printf("%s Progress: 100%%\r\n", path);
