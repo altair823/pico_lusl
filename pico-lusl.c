@@ -11,7 +11,7 @@
 #define MINOR_VERSION 0
 #define PATCH_VERSION 2
 
-#define CHUNK_DATA_SIZE 65536
+#define CHUNK_DATA_SIZE 32768
 typedef unsigned char byte;
 typedef byte *byte_ptr;
 
@@ -24,7 +24,7 @@ bool read_file(FIL *file, byte_ptr data, size_t label_len, UINT read_count) {
 }
 
 int main() {
-    char filename[] = "filename.srl";
+    char filename[] = "SPA_pico.srl";
     FIL file;
 
     // Initialize chosen serial port
@@ -128,7 +128,21 @@ int main() {
         dir_name[last_dir_index] = '\0';
 
         // Create directory
-        result = f_mkdir(dir_name);
+        int slash_index = 0;
+        for (int i = 0; i < last_dir_index + 1; i++) {
+            if (dir_name[i] == '/' || i == last_dir_index) {
+                slash_index = i;
+                char *sub_dir_name = (char *)malloc(sizeof(char) * (slash_index + 1));
+                strncpy(sub_dir_name, dir_name, slash_index);
+                sub_dir_name[slash_index] = '\0';
+                result = f_mkdir(sub_dir_name);
+                if (result != FR_OK && result != FR_EXIST) {
+                    printf("ERROR: Could not create directory (%d)\r\n", result);
+                    return -1;
+                }
+                free(sub_dir_name);
+            }
+        }
         if (result != FR_OK && result != FR_EXIST) {
             printf("ERROR: Could not create directory (%d)\r\n", result);
             return -1;
@@ -186,4 +200,14 @@ int main() {
         printf("%s Progress: 100%%\r\n", path);
         free(path);
     }
+    printf("Total read count: %d\r\n", read_count);
+    f_close(&file);
+    // blink led
+    while (1) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(250);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(250);
+    }
+    
 }
