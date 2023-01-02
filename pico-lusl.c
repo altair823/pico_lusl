@@ -15,8 +15,9 @@
 typedef unsigned char byte;
 typedef byte *byte_ptr;
 
-bool read_file(FIL *file, byte_ptr data, size_t label_len, UINT read_count) {
-    if (f_read(file, data, label_len, &read_count) != FR_OK || read_count < label_len) {
+bool read_file(FIL *file, byte_ptr buf, size_t buf_size) {
+    UINT read_count = 0;
+    if (f_read(file, buf, buf_size, &read_count) != FR_OK || read_count < buf_size) {
         printf("ERROR: Could not read from file\r\n");
         return false;
     }
@@ -58,7 +59,7 @@ int main() {
     // Check file label
     size_t label_len = strlen(FILE_LABEL);
     buf = (byte_ptr)malloc(sizeof(byte) * label_len);
-    read_file(&file, buf, label_len, read_count);
+    read_file(&file, buf, label_len);
     if (strncmp(FILE_LABEL, buf, label_len) != 0) {
         printf("ERROR: File is not a valid LUSL serialized file\r\n");
         return -1;
@@ -67,7 +68,7 @@ int main() {
 
     // Check file version
     buf = (byte_ptr)malloc(sizeof(byte) * 4);
-    read_file(&file, buf, 4, read_count);
+    read_file(&file, buf, 4);
     if (buf[0] != FILE_VERSION_FLAG) {
         printf("ERROR: File is not a valid LUSL serialized file\r\n");
         return -1;
@@ -80,7 +81,7 @@ int main() {
 
     // Read flags
     buf = (byte_ptr)malloc(sizeof(byte) * 1);
-    read_file(&file, buf, 1, read_count);
+    read_file(&file, buf, 1);
     if (buf[0] != 0) {
         printf("ERROR: Cannot read file with this program\r\n");
         return -1;
@@ -89,11 +90,11 @@ int main() {
 
     // Read file count
     buf = (byte_ptr)malloc(sizeof(byte) * 1);
-    read_file(&file, buf, 1, read_count);
+    read_file(&file, buf, 1);
     int file_count_bytes = buf[0];
     free(buf);
     buf = (byte_ptr)malloc(sizeof(byte) * file_count_bytes);
-    read_file(&file, buf, file_count_bytes, read_count);
+    read_file(&file, buf, file_count_bytes);
     int file_count = 0;
     // Convert byte array to int with little endian
     for (int i = 0; i < file_count_bytes; i++) {
@@ -105,11 +106,11 @@ int main() {
     for (int i = 0; i < file_count; i++) {
         // Read file name
         buf = (byte_ptr)malloc(sizeof(byte) * 2);
-        read_file(&file, buf, 2, read_count);
+        read_file(&file, buf, 2);
         int file_name_len = (buf[0] << 8) + buf[1];
         free(buf);
         buf = (byte_ptr)malloc(sizeof(byte) * file_name_len);
-        read_file(&file, buf, file_name_len, read_count);
+        read_file(&file, buf, file_name_len);
         char *path = (char *)malloc(sizeof(char) * (file_name_len + 1));
         strncpy(path, buf, file_name_len);
         path[file_name_len] = '\0';
@@ -151,14 +152,14 @@ int main() {
 
         // Read file type
         buf = (byte_ptr)malloc(sizeof(byte) * 1);
-        read_file(&file, buf, 1, read_count);
+        read_file(&file, buf, 1);
         int file_type = buf[0];
         free(buf);
 
         // Read file size
         int size_bytes = file_type & 0xf;
         buf = (byte_ptr)malloc(sizeof(byte) * size_bytes);
-        read_file(&file, buf, size_bytes, read_count);
+        read_file(&file, buf, size_bytes);
         int file_size = 0;
         // Convert byte array to int with little endian
         for (int i = 0; i < size_bytes; i++) {
@@ -168,7 +169,7 @@ int main() {
 
         // Read file checksum
         buf = (byte_ptr)malloc(sizeof(byte) * 32);
-        read_file(&file, buf, 32, read_count);
+        read_file(&file, buf, 32);
         free(buf);
 
         printf("File name: %s\r\n", path);
@@ -182,29 +183,29 @@ int main() {
         f_open(&result_file, path, FA_WRITE | FA_CREATE_ALWAYS);
         int p = 0;
         for (int j = 0; j < chunk_count; j++, p++) {
-            buf = (byte_ptr)malloc(sizeof(byte) * CHUNK_DATA_SIZE);
-            read_file(&file, buf, CHUNK_DATA_SIZE, read_count);
+            buf = (byte_ptr)malloc(sizeof(byte) * CHUNK_DATA_SIZE); 
+            read_file(&file, buf, CHUNK_DATA_SIZE); 
             UINT write_count = 0;
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            f_write(&result_file, buf, CHUNK_DATA_SIZE, &write_count);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1); // blink LED
+            f_write(&result_file, buf, CHUNK_DATA_SIZE, &write_count); // write chunk
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0); // blink LED
             free(buf);
             printf("%s Progress: %d%%\r", path, (p * 100) / chunk_count);
         }
         if (last_chunk_size > 0) {
             buf = (byte_ptr)malloc(sizeof(byte) * last_chunk_size);
-            read_file(&file, buf, last_chunk_size, read_count);
+            read_file(&file, buf, last_chunk_size);
             UINT write_count = 0;
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            f_write(&result_file, buf, last_chunk_size, &write_count);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1); // blink LED
+            f_write(&result_file, buf, last_chunk_size, &write_count); // write last chunk
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0); // blink LED
             free(buf);
         }
         f_close(&result_file);
         printf("%s Progress: 100%%\r\n", path);
         free(path);
     }
-    printf("Total read count: %d\r\n", read_count);
+    printf("Done\r\n");
     f_close(&file);
     // blink led
     while (1) {

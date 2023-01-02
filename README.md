@@ -41,3 +41,9 @@ The CD(Card Detect) pin is optional if you use only a one card slot.
 | CD    |       | 22    | 29    |           | CD        | Card Detect            |
 | GND   |       |       | 18,23 |           | GND       | Ground                 |
 | 3v3   |       |       | 36    |           | 3v3       | 3.3 volt power         |
+
+
+## Warning
+
+- If file path has non-ascii character such as utf-8, utf-16, etc., the function cannot creates directories and files normally. 
+- Please be aware the limitation of Fat32 format when you using it(like 4GB file size limit).
